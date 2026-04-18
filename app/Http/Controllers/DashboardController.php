@@ -23,10 +23,10 @@ class DashboardController extends Controller
             return $t->amount * $t->quantity;
         });
 
-        // 💰 SALDO SEKARANG (REAL)
+        //  SALDO SEKARANG 
         $saldoSekarang = $user->balance;
 
-        // 🔥 STATUS
+        // STATUS
         if ($saldoSekarang <= 0) {
             $status = "BAHAYA";
             $color = "red";
@@ -38,7 +38,7 @@ class DashboardController extends Controller
             $color = "green";
         }
 
-        // 🔔 NOTIFIKASI SALDO MENIPIS (ANTI SPAM)
+        // NOTIFIKASI SALDO MENIPIS (ANTI SPAM)
         $hasUnread = $user->unreadNotifications()
             ->where('type', SaldoMenipis::class)
             ->exists();
@@ -47,7 +47,7 @@ class DashboardController extends Controller
             $user->notify(new SaldoMenipis());
         }
 
-        // 📊 PERSENTASE (estimasi dari total uang masuk)
+        //  PERSENTASE (estimasi dari total uang masuk)
         $totalTopUp = $saldoSekarang + $totalPengeluaran;
 
         $percentage = $totalTopUp > 0
@@ -75,7 +75,7 @@ class DashboardController extends Controller
         ));
     }
 
-    // 💰 TOP UP
+    //  TOP UP
     public function updateBalance(Request $request)
     {
         $request->validate([
