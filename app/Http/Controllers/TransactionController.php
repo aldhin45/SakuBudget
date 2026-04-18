@@ -59,7 +59,7 @@ class TransactionController extends Controller
     $quantity = $request->quantity ?? 1;
     $total = $request->amount * $quantity;
 
-    // ✅ CEK LANGSUNG DARI SALDO
+    // CEK LANGSUNG DARI SALDO
     if ($user->balance < $total) {
         return back()->with('error', 'Saldo tidak mencukupi!');
     }
@@ -74,7 +74,7 @@ class TransactionController extends Controller
         'note' => $request->note,
     ]);
 
-    // 🔥 KURANGI SALDO (INI KUNCI)
+    //  KURANGI SALDO 
     $user->balance -= $total;
     $user->save();
 
