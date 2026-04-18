@@ -1,17 +1,37 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\TopUpController;
 
+/*
+|--------------------------------------------------------------------------
+| Public (Landing)
+|--------------------------------------------------------------------------
+*/
 Route::get('/', function () {
-    return view('welcome');
-});
+    return view('landing');
+})->name('landing');
 
+/*
+|--------------------------------------------------------------------------
+| Protected (Login Required)
+|--------------------------------------------------------------------------
+*/
 Route::middleware(['auth'])->group(function () {
 
-    // ⬅️ HARUS DI ATAS
+    // Dashboard
+    Route::get('/dashboard', [DashboardController::class, 'index'])
+        ->name('dashboard');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Transactions
+    |--------------------------------------------------------------------------
+    */
     Route::get('/transactions/export', [TransactionController::class, 'export'])
         ->name('transactions.export');
 
@@ -19,30 +39,65 @@ Route::middleware(['auth'])->group(function () {
         ->name('transactions.pdf');
 
     Route::resource('transactions', TransactionController::class);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Profile
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/profile', [ProfileController::class, 'edit'])
+        ->name('profile.edit');
+
+    Route::patch('/profile', [ProfileController::class, 'update'])
+        ->name('profile.update');
+
+    Route::delete('/profile', [ProfileController::class, 'destroy'])
+        ->name('profile.destroy');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Categories
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/categories', [CategoryController::class, 'index'])
+        ->name('categories.index');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Top Up
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/topup', function () {
+        return view('topup');
+    })->name('topup');
+
+    Route::post('/topup', [TopUpController::class, 'store'])
+        ->name('topup.store');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notifications
+    |--------------------------------------------------------------------------
+    */
+
+    // READ 1 NOTIF
+Route::post('/notifications/{id}/read', function ($id) {
+    $notif = auth()->user()->notifications()->findOrFail($id);
+    $notif->markAsRead();
+    return back();
+})->name('notifications.read.single');
+
+// READ ALL
+Route::post('/notifications/read', function () {
+    auth()->user()->unreadNotifications->markAsRead();
+    return back();
+})->name('notifications.read');
+
 });
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
-
-Route::middleware('auth')->group(function () {
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-});
-Route::middleware(['auth'])->group(function () {
-
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-
-    Route::resource('transactions', TransactionController::class);
-
-});
-Route::get('/transactions/export', [TransactionController::class, 'export'])
-    ->name('transactions.export');
-
+/*
+|--------------------------------------------------------------------------
+| Auth Routes
+|--------------------------------------------------------------------------
+*/
 require __DIR__.'/auth.php';
-
-Route::post('/update-balance', [DashboardController::class, 'updateBalance'])
-    ->name('update.balance');
-
-

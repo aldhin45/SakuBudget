@@ -3,110 +3,91 @@
 namespace App\Http\Controllers;
 
 use App\Models\Transaction;
-use App\Models\Category;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
+use App\Notifications\SaldoMenipis;
 
 class DashboardController extends Controller
 {
     public function index()
-{
-    $transactions = Transaction::where('user_id', Auth::id())->get();
+    {
+        $user = Auth::user();
 
-    // TOTAL 
-    $total = $transactions->sum(function ($t) {
-        return $t->amount * $t->quantity;
-    });
+        $transactions = Transaction::with('category')
+            ->where('user_id', $user->id)
+            ->latest()
+            ->get();
 
-    $saldo = Auth::user()->balance;
-    $sisa = $saldo - $total;
-
-    // STATUS 
-    if ($sisa <= 0) {
-        $status = "BAHAYA";
-        $color = "red";
-    } elseif ($sisa < $saldo * 0.3) {
-        $status = "WASPADA";
-        $color = "orange";
-    } else {
-        $status = "AMAN";
-        $color = "green";
-    }
-
-    // HARI INI
-    $todayTotal = $transactions->filter(function ($t) {
-        return \Carbon\Carbon::parse($t->date)->isToday();
-    })->sum(function ($t) {
-        return $t->amount * $t->quantity;
-    });
-
-    // 🔥 BULAN INI
-    $monthlyTotal = $transactions->filter(function ($t) {
-        return \Carbon\Carbon::parse($t->date)->isCurrentMonth();
-    })->sum(function ($t) {
-        return $t->amount * $t->quantity;
-    });
-
-    // RULE 80%
-    $warnings = [];
-
-    foreach ($transactions->groupBy('category_id') as $catId => $items) {
-        $totalCat = $items->sum(function ($t) {
+        // TOTAL PENGELUARAN
+        $totalPengeluaran = $transactions->sum(function ($t) {
             return $t->amount * $t->quantity;
         });
 
-        $category = Category::find($catId);
+        // 💰 SALDO SEKARANG (REAL)
+        $saldoSekarang = $user->balance;
 
-        if ($category && $totalCat >= 0.8 * $category->budget_limit) {
-            $warnings[] = [
-                'category' => $category->name,
-                'total' => $totalCat,
-                'limit' => $category->budget_limit
-            ];
+        // 🔥 STATUS
+        if ($saldoSekarang <= 0) {
+            $status = "BAHAYA";
+            $color = "red";
+        } elseif ($saldoSekarang < 50000) {
+            $status = "WASPADA";
+            $color = "orange";
+        } else {
+            $status = "AMAN";
+            $color = "green";
         }
-    }
 
-    // PROGRESS
-    $categoryProgress = [];
+        // 🔔 NOTIFIKASI SALDO MENIPIS (ANTI SPAM)
+        $hasUnread = $user->unreadNotifications()
+            ->where('type', SaldoMenipis::class)
+            ->exists();
 
-    foreach ($transactions->groupBy('category_id') as $catId => $items) {
-        $category = Category::find($catId);
-        if (!$category) continue;
+        if ($saldoSekarang < 50000 && !$hasUnread) {
+            $user->notify(new SaldoMenipis());
+        }
 
-        $totalCat = $items->sum(function ($t) {
-            return $t->amount * $t->quantity;
-        });
+        // 📊 PERSENTASE (estimasi dari total uang masuk)
+        $totalTopUp = $saldoSekarang + $totalPengeluaran;
 
-        $percent = $category->budget_limit > 0
-            ? ($totalCat / $category->budget_limit) * 100
+        $percentage = $totalTopUp > 0
+            ? ($saldoSekarang / $totalTopUp) * 100
             : 0;
 
-        $categoryProgress[] = [
-            'name' => $category->name,
-            'percent' => $percent
-        ];
+        $percentage = min(100, max(0, round($percentage)));
+
+        // TRANSAKSI TERBARU
+        $latestTransactions = $transactions->take(3);
+
+        // PENGELUARAN TERBESAR
+        $maxTransaction = $transactions->sortByDesc(function ($t) {
+            return $t->amount * $t->quantity;
+        })->first();
+
+        return view('dashboard', compact(
+            'saldoSekarang',
+            'totalPengeluaran',
+            'status',
+            'color',
+            'latestTransactions',
+            'maxTransaction',
+            'percentage'
+        ));
     }
 
-    return view('dashboard', compact(
-        'total',
-        'status',
-        'color',
-        'todayTotal',
-        'monthlyTotal',
-        'warnings',
-        'categoryProgress'
-    ));
-}
+    // 💰 TOP UP
     public function updateBalance(Request $request)
     {
         $request->validate([
-            'balance' => 'required|numeric|min:0'
+            'balance' => 'required|numeric|min:1'
         ]);
 
         $user = Auth::user();
-        $user->balance = $request->balance;
+
+        // tambah saldo
+        $user->balance += $request->balance;
         $user->save();
 
-        return back()->with('success', 'Saldo berhasil diperbarui!');
+        return back()->with('success', 'Top up berhasil!');
     }
 }

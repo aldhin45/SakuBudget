@@ -1,3 +1,13 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* --- Tambahan untuk SakuBudget --- */
+
+/* Ikon garis putih kustom */
+.stroke-white {
+    -webkit-text-stroke: 1.5px white; /* Mengatur ketebalan garis */
+    color: transparent; /* Membuat warna dalam ikon transparan */
+}
+
+/* --------------------------------- */

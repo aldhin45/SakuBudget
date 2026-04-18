@@ -11,9 +11,34 @@ export default {
 
     theme: {
         extend: {
-            fontFamily: {
-                sans: ['Figtree', ...defaultTheme.fontFamily.sans],
+            // --- Tambahan untuk SakuBudget ---
+            keyframes: {
+                fadeIn: {
+                    '0%': { opacity: '0', transform: 'translateY(10px)' },
+                    '100%': { opacity: '1', transform: 'translateY(0)' },
+                }
             },
+            animation: {
+                'fade-in': 'fadeIn 0.4s ease-out forwards',
+            },
+            // ----------------------------------
+            
+            fontFamily: {
+                sans: ['Poppins', ...defaultTheme.fontFamily.sans],
+            },
+            fontFamily: {
+                sans: ['Poppins', ...defaultTheme.fontFamily.sans], // Ganti font agar lebih modern
+            },
+            colors: {
+                'sakubudget-blue-dark': '#0c4d7c',
+                'sakubudget-teal': '#2b95b1',
+                'sakubudget-oranye': '#ff9f43',
+                'sakubudget-form-bg': '#2b95b1', // Warna teal solid untuk panel formulir
+            },
+            backgroundImage: {
+                'sakubudget-gradient': "linear-gradient(to right, #0c4d7c, #2b95b1)", // Gradien latar belakang
+            },
+            // ---------------------------------
         },
     },
 

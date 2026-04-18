@@ -47,24 +47,40 @@ class TransactionController extends Controller
     }
 
     public function store(Request $request)
-    {
-        $request->validate([
-            'amount' => 'required|numeric',
-            'category_id' => 'required',
-            'date' => 'required|date'
-        ]);
+{
+    $request->validate([
+        'amount' => 'required|numeric|min:0',
+        'category_id' => 'required',
+        'date' => 'required|date'
+    ]);
 
-        Transaction::create([
-            'user_id' => Auth::id(),
-            'category_id' => $request->category_id,
-            'amount' => $request->amount,
-            'quantity' => $request->quantity,
-            'date' => \Carbon\Carbon::parse($request->date),
-            'note' => $request->note,
-        ]);
+    $user = Auth::user();
 
-        return redirect()->route('transactions.index')->with('success', 'Berhasil tambah transaksi!');
+    $quantity = $request->quantity ?? 1;
+    $total = $request->amount * $quantity;
+
+    // ✅ CEK LANGSUNG DARI SALDO
+    if ($user->balance < $total) {
+        return back()->with('error', 'Saldo tidak mencukupi!');
     }
+
+    // simpan transaksi
+    Transaction::create([
+        'user_id' => $user->id,
+        'category_id' => $request->category_id,
+        'amount' => $request->amount,
+        'quantity' => $quantity,
+        'date' => \Carbon\Carbon::parse($request->date),
+        'note' => $request->note,
+    ]);
+
+    // 🔥 KURANGI SALDO (INI KUNCI)
+    $user->balance -= $total;
+    $user->save();
+
+    return redirect()->route('transactions.index')
+        ->with('success', 'Berhasil tambah transaksi!');
+}
 
     public function edit($id)
     {
@@ -78,36 +94,56 @@ class TransactionController extends Controller
     }
 
     public function update(Request $request, $id)
-    {
-        $request->validate([
-            'amount' => 'required|numeric',
-            'category_id' => 'required',
-            'date' => 'required|date'
-        ]);
+{
+    $request->validate([
+        'amount' => 'required|numeric',
+        'category_id' => 'required',
+        'date' => 'required|date'
+    ]);
 
-        $transaction = Transaction::where('id', $id)
-            ->where('user_id', Auth::id())
-            ->firstOrFail();
+    $transaction = Transaction::where('id', $id)
+        ->where('user_id', Auth::id())
+        ->firstOrFail();
 
-        $transaction->update([
-            'category_id' => $request->category_id,
-            'amount' => $request->amount,
-            'quantity' => $request->quantity,
-            'date' => \Carbon\Carbon::parse($request->date),
-            'note' => $request->note,
-        ]);
+    $user = Auth::user();
 
-        return redirect()->route('transactions.index')->with('success', 'Berhasil update!');
+    $oldTotal = $transaction->amount * $transaction->quantity;
+    $newQuantity = $request->quantity ?? 1;
+    $newTotal = $request->amount * $newQuantity;
+
+    $difference = $newTotal - $oldTotal;
+
+    // cek saldo kalau nambah
+    if ($difference > 0 && $user->balance < $difference) {
+        return back()->with('error', 'Saldo tidak mencukupi!');
     }
+
+    // update transaksi
+    $transaction->update([
+        'category_id' => $request->category_id,
+        'amount' => $request->amount,
+        'quantity' => $newQuantity,
+        'date' => \Carbon\Carbon::parse($request->date),
+        'note' => $request->note,
+    ]);
+
+    // update saldo
+    $user->balance -= $difference;
+    $user->save();
+
+    return redirect()->route('transactions.index')->with('success', 'Berhasil update!');
+}
 
     public function destroy($id)
-    {
-        Transaction::where('id', $id)
-            ->where('user_id', Auth::id())
-            ->delete();
+{
+    $transaction = Transaction::where('id', $id)
+        ->where('user_id', Auth::id())
+        ->firstOrFail();
 
-        return back()->with('success', 'Data dihapus');
-    }
+    $transaction->delete();
+
+    return back()->with('success', 'Data dihapus');
+}
 
     public function export()
     {
