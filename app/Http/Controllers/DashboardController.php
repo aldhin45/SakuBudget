@@ -10,23 +10,33 @@ use App\Notifications\SaldoMenipis;
 class DashboardController extends Controller
 {
     public function index()
-    {
-        $user = Auth::user();
+{
+    $user = Auth::user();
 
-        $transactions = Transaction::with('category')
-            ->where('user_id', $user->id)
-            ->latest()
-            ->get();
+    // Safety kalau user belum ada
+    if (!$user) {
+        return redirect()->route('login');
+    }
 
-        // TOTAL PENGELUARAN
-        $totalPengeluaran = $transactions->sum(function ($t) {
-            return $t->amount * $t->quantity;
-        });
+    $transactions = Transaction::with('category')
+        ->where('user_id', $user->id)
+        ->latest()
+        ->get();
 
-        //  SALDO SEKARANG 
-        $saldoSekarang = $user->balance;
+    // TOTAL PENGELUARAN
+    $totalPengeluaran = $transactions->sum(function ($t) {
+        return $t->amount * ($t->quantity ?? 1);
+    });
 
-        // STATUS
+    // SALDO SEKARANG 
+    $saldoSekarang = $user->balance ?? 0;
+
+    // ANGAN KASIH ALARM KALAU BELUM PERNAH TOPUP
+    if ($saldoSekarang == 0 && $totalPengeluaran == 0) {
+        $status = "BELUM ADA DATA";
+        $color = "gray";
+    } else {
+        // STATUS NORMAL
         if ($saldoSekarang <= 0) {
             $status = "BAHAYA";
             $color = "red";
@@ -37,43 +47,44 @@ class DashboardController extends Controller
             $status = "AMAN";
             $color = "green";
         }
-
-        // NOTIFIKASI SALDO MENIPIS (ANTI SPAM)
-        $hasUnread = $user->unreadNotifications()
-            ->where('type', SaldoMenipis::class)
-            ->exists();
-
-        if ($saldoSekarang < 50000 && !$hasUnread) {
-            $user->notify(new SaldoMenipis());
-        }
-
-        //  PERSENTASE (estimasi dari total uang masuk)
-        $totalTopUp = $saldoSekarang + $totalPengeluaran;
-
-        $percentage = $totalTopUp > 0
-            ? ($saldoSekarang / $totalTopUp) * 100
-            : 0;
-
-        $percentage = min(100, max(0, round($percentage)));
-
-        // TRANSAKSI TERBARU
-        $latestTransactions = $transactions->take(3);
-
-        // PENGELUARAN TERBESAR
-        $maxTransaction = $transactions->sortByDesc(function ($t) {
-            return $t->amount * $t->quantity;
-        })->first();
-
-        return view('dashboard', compact(
-            'saldoSekarang',
-            'totalPengeluaran',
-            'status',
-            'color',
-            'latestTransactions',
-            'maxTransaction',
-            'percentage'
-        ));
     }
+
+    // NOTIFIKASI (ANTI SPAM + JANGAN KIRIM KALAU 0)
+    $hasUnread = $user->unreadNotifications()
+        ->where('type', SaldoMenipis::class)
+        ->exists();
+
+    if ($saldoSekarang > 0 && $saldoSekarang < 50000 && !$hasUnread) {
+        $user->notify(new SaldoMenipis());
+    }
+
+    // PERSENTASE KEUANGAN
+    $totalTopUp = $saldoSekarang + $totalPengeluaran;
+
+    $percentage = $totalTopUp > 0
+        ? ($saldoSekarang / $totalTopUp) * 100
+        : 0;
+
+    $percentage = min(100, max(0, round($percentage)));
+
+    // TRANSAKSI TERBARU
+    $latestTransactions = $transactions->take(3);
+
+    // PENGELUARAN TERBESAR
+    $maxTransaction = $transactions->sortByDesc(function ($t) {
+        return $t->amount * ($t->quantity ?? 1);
+    })->first();
+
+    return view('dashboard', compact(
+        'saldoSekarang',
+        'totalPengeluaran',
+        'status',
+        'color',
+        'latestTransactions',
+        'maxTransaction',
+        'percentage'
+    ));
+}
 
     //  TOP UP
     public function updateBalance(Request $request)

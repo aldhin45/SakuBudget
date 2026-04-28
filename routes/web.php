@@ -7,6 +7,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\TopUpController;
 
+
 /*
 |--------------------------------------------------------------------------
 | Public (Landing)
@@ -67,12 +68,8 @@ Route::middleware(['auth'])->group(function () {
     | Top Up
     |--------------------------------------------------------------------------
     */
-    Route::get('/topup', function () {
-        return view('topup');
-    })->name('topup');
-
-    Route::post('/topup', [TopUpController::class, 'store'])
-        ->name('topup.store');
+    Route::get('/topup', [TopUpController::class, 'index'])->name('topup');
+    Route::post('/topup', [TopUpController::class, 'store'])->name('topup.store');
 
     /*
     |--------------------------------------------------------------------------
